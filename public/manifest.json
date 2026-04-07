@@ -1,0 +1,14 @@
+{
+  "name": "Vyde",
+  "short_name": "Vyde",
+  "description": "Your place, together.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0814",
+  "theme_color": "#0a0814",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icons/192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

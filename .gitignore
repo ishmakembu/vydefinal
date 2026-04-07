@@ -36,6 +36,15 @@ yarn-error.log*
 # vercel
 .vercel
 
+# partykit local dev state
+.partykit/state/
+
+# playwright test results
+test-results/
+playwright-report/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+certificates
