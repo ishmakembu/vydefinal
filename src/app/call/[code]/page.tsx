@@ -413,7 +413,7 @@ export default function CallPage() {
 
   return (
     <div
-      className="w-screen flex flex-col overflow-hidden"
+      className="w-full flex flex-col overflow-hidden"
       style={{ background: 'var(--bg-base)', height: '100dvh' }}
     >
       <BackgroundOrbs />

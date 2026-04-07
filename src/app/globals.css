@@ -107,7 +107,7 @@ body {
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-body);
-  overflow: hidden;
+  overflow-x: hidden; /* prevent horizontal scroll site-wide */
   height: 100%;
   margin: 0;
   padding: 0;

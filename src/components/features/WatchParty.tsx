@@ -158,7 +158,7 @@ export default function WatchParty() {
             allow="autoplay; fullscreen; encrypted-media"
             allowFullScreen
             title="Watch party content"
-            style={{ border: 'none', maxHeight: 'calc(100vh - 120px)' }}
+            style={{ border: 'none', maxHeight: 'calc(100dvh - 120px)' }}
           />
         )}
       </div>

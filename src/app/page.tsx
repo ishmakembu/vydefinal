@@ -47,7 +47,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-4" style={{ overflowY: 'auto', overflow: 'auto' }}>
+    <main className="min-h-dvh flex flex-col items-center justify-center p-4" style={{ overflowY: 'auto', overflow: 'auto' }}>
       <BackgroundOrbs />
       <ToastSystem />
 
