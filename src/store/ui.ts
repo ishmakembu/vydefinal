@@ -49,10 +49,29 @@ export const useUIStore = create<UIStore>((set, get) => ({
 
   toggleChat: () => {
     const { isChatOpen } = get()
-    set({ isChatOpen: !isChatOpen, unreadCount: 0 })
+    // When opening Chat, close Music and Theatre to avoid sidebar collisions.
+    set({
+      isChatOpen: !isChatOpen,
+      unreadCount: 0,
+      isMusicOpen: false,
+      isTheatreMode: false
+    })
   },
-  toggleTheatre: () => set(s => ({ isTheatreMode: !s.isTheatreMode })),
-  toggleMusic: () => set(s => ({ isMusicOpen: !s.isMusicOpen })),
+  toggleTheatre: () => set(s => ({
+    isTheatreMode: !s.isTheatreMode,
+    // Theatre mode uses the full sidebar area, so close other panels.
+    isChatOpen: false,
+    isMusicOpen: false
+  })),
+  toggleMusic: () => {
+    const { isMusicOpen } = get()
+    // When opening Music, close Chat and Theatre to avoid sidebar collisions.
+    set({
+      isMusicOpen: !isMusicOpen,
+      isChatOpen: false,
+      isTheatreMode: false
+    })
+  },
   setPipPosition: (pos) => set({ pipPosition: pos }),
   swapMainView: () => set(s => ({ mainView: s.mainView === 'remote' ? 'self' : 'remote' })),
   setActivePanel: (panel) => set({ activePanel: panel }),

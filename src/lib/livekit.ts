@@ -24,8 +24,8 @@ export const ROOM_OPTIONS: RoomOptions = {
     videoSimulcastLayers: [],
     videoEncoding: {
       // LiveKit bitrate guide: 720p VP9 webcam needs ~700kbps for VMAF 90.
-      // 3 Mbps ceiling gives headroom for 1080p and fast motion without waste.
-      maxBitrate: 3_000_000,
+      // 1.5 Mbps ceiling gives headroom for fast motion while keeping CPU usage low.
+      maxBitrate: 1_500_000,
       maxFramerate: 30,
     },
     dtx: true,
@@ -38,16 +38,16 @@ export const ROOM_OPTIONS: RoomOptions = {
     echoCancellation: true,
     noiseSuppression: true,
     autoGainControl: true,
-    sampleRate: 48000,
+    // Removing strict 48k sample rate to allow the browser to negotiate the best
+    // hardware-native rate, improving compatibility across diverse device mics.
     channelCount: 1,
   },
   videoCaptureDefaults: {
-    // Capture at 1080p — SVC downscales internally for lower layers.
-    // Using exact numbers as required by LiveKit's VideoResolution type;
-    // the browser will use its closest supported resolution if 1080p isn't available.
+    // Capturing at 720p — Reduces encoding overhead by ~50% compared to 1080p,
+    // which fixes the reported 5 FPS lag when combined with heavy UI blur effects.
     resolution: {
-      width: 1920,
-      height: 1080,
+      width: 1280,
+      height: 720,
       frameRate: 30,
     },
     facingMode: 'user',
