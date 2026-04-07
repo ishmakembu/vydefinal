@@ -25,4 +25,4 @@ services:
       - key: NEXT_PUBLIC_TURN_PASS
         sync: false
       - key: NEXT_PUBLIC_APP_URL
-        value: https://vyde.onrender.com
+        value: https://vydefinal.onrender.com

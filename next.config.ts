@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['192.168.100.222'],
   reactStrictMode: true,
   experimental: {
-    serverActions: { allowedOrigins: ['vyde.onrender.com'] },
+    serverActions: { allowedOrigins: ['vydefinal.onrender.com'] },
   },
   async headers() {
     return [
