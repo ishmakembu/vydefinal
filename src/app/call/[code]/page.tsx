@@ -3,9 +3,9 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  Room, RoomEvent, ConnectionState, Track,
+  Room, RoomEvent, ConnectionState, Track, VideoQuality,
   type RemoteTrackPublication, type RemoteParticipant,
-  type LocalVideoTrack, type RemoteVideoTrack, type LocalAudioTrack,
+  type LocalVideoTrack, type RemoteVideoTrack,
 } from 'livekit-client'
 import { useCallStore } from '@/store/call'
 import { useUIStore } from '@/store/ui'
@@ -79,7 +79,7 @@ export default function CallPage() {
     setRemoteDisplayName, setMic, setCamera,
     displayName, reset: resetCall,
   } = useCallStore()
-  const { addMessage, setMessages, setMusicQueue, setWatchState, addReaction, isChatOpen, toggleTheatre, reset: resetUI } = useUIStore()
+  const { setMessages, setMusicQueue, setWatchState, addReaction, isChatOpen, toggleTheatre, reset: resetUI } = useUIStore()
 
   const roomRef = useRef<Room | null>(null)
   const abrRef = useRef<AdaptiveBitrateManager | null>(null)
@@ -274,8 +274,11 @@ export default function CallPage() {
         }
       })
 
-      room.on(RoomEvent.TrackSubscribed, (track, _pub: RemoteTrackPublication, participant: RemoteParticipant) => {
+      room.on(RoomEvent.TrackSubscribed, (track, pub: RemoteTrackPublication, participant: RemoteParticipant) => {
         if (track.kind === Track.Kind.Video) {
+          // Request the highest SVC layer immediately — don't wait for ABR to ramp up.
+          // VideoQuality.HIGH maps to the top spatial layer in VP9 SVC (L3T3_KEY).
+          pub.setVideoQuality(VideoQuality.HIGH)
           setRemoteVideoTrack(track as RemoteVideoTrack)
           setRemoteParticipant(participant)
           setRemoteDisplayName(participant.identity)
@@ -346,8 +349,8 @@ export default function CallPage() {
     setRoomCode, setConnected, setConnecting, setLocalParticipant,
     setRemoteParticipant, setNetworkQuality, setRemoteDisplayName,
     setMic, setCamera,
-    addMessage, setMessages, setMusicQueue, setWatchState, addReaction,
-    isChatOpen, toggleTheatre,
+    setMessages, setMusicQueue, setWatchState, addReaction,
+    toggleTheatre,
   ])
 
   useEffect(() => {

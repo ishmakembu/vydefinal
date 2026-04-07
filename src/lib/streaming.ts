@@ -1,13 +1,13 @@
-import { Room, Track } from 'livekit-client'
+import { Room, Track, VideoQuality } from 'livekit-client'
 import type { RTCSample, QualityTier } from '@/types'
 
 export const QUALITY_TIERS: readonly QualityTier[] = [
-  { name: 'minimal',  maxBitrate:    80_000, resolution: { w: 160, h: 90  }, fps: 10 },
-  { name: 'low',      maxBitrate:   200_000, resolution: { w: 320, h: 180 }, fps: 15 },
-  { name: 'medium',   maxBitrate:   500_000, resolution: { w: 640, h: 360 }, fps: 24 },
-  { name: 'good',     maxBitrate:   900_000, resolution: { w: 854, h: 480 }, fps: 30 },
-  { name: 'high',     maxBitrate: 1_500_000, resolution: { w: 1280, h: 720 }, fps: 30 },
-  { name: 'ultra',    maxBitrate: 2_500_000, resolution: { w: 1920, h: 1080 }, fps: 30 },
+  { name: 'minimal',  maxBitrate:   200_000, resolution: { w: 320,  h: 180  }, fps: 15 },
+  { name: 'low',      maxBitrate:   400_000, resolution: { w: 640,  h: 360  }, fps: 20 },
+  { name: 'medium',   maxBitrate:   700_000, resolution: { w: 640,  h: 360  }, fps: 30 },
+  { name: 'good',     maxBitrate: 1_250_000, resolution: { w: 1280, h: 720  }, fps: 30 },
+  { name: 'high',     maxBitrate: 2_000_000, resolution: { w: 1280, h: 720  }, fps: 30 },
+  { name: 'ultra',    maxBitrate: 3_000_000, resolution: { w: 1920, h: 1080 }, fps: 30 },
 ] as const
 
 function avg(nums: number[]): number {
@@ -16,10 +16,10 @@ function avg(nums: number[]): number {
 }
 
 export class AdaptiveBitrateManager {
-  private currentTier = 3 // start at 'good'
+  private currentTier = 4 // start at 'high' (720p) — assume good connection until proven otherwise
   private samples: RTCSample[] = []
   private lastUpgrade = 0
-  private readonly UPGRADE_COOLDOWN = 4000
+  private readonly UPGRADE_COOLDOWN = 8_000 // was 4s — less thrashing on VP9 SVC
   private onTierChange?: (tier: QualityTier) => void
   private intervalId?: ReturnType<typeof setInterval>
 
@@ -85,9 +85,11 @@ export class AdaptiveBitrateManager {
     const avgLoss = avg(this.samples.map(s => s.packetLoss))
     const avgRtt = avg(this.samples.map(s => s.rtt))
 
-    // Immediate downgrade
-    if (sample.packetLoss > 5 || sample.rtt > 200) {
-      this.setTier(Math.max(0, this.currentTier - 1))
+    // Downgrade only on sustained bad conditions (>8% loss or >250ms RTT)
+    // Raised from 5%/200ms — avoids dropping quality on brief network blips.
+    // Floor at index 1 (low/360p) — never go below readable quality.
+    if (sample.packetLoss > 8 || sample.rtt > 250) {
+      this.setTier(Math.max(1, this.currentTier - 1))
       return
     }
 
@@ -113,19 +115,21 @@ export class AdaptiveBitrateManager {
   }
 
   private applyTier(tier: QualityTier): void {
-    const pub = this.room.localParticipant.getTrackPublication(Track.Source.Camera)
-    if (!pub?.videoTrack) return
+    // With VP9 SVC, LiveKit manages spatial layer selection natively via adaptiveStream.
+    // We set VideoQuality hints on remote subscriptions — this tells LiveKit which
+    // SVC layer to forward, working WITH its quality management instead of
+    // fighting it with applyConstraints() on the raw MediaStreamTrack.
+    const quality =
+      tier.maxBitrate >= 1_250_000 ? VideoQuality.HIGH :
+      tier.maxBitrate >= 400_000   ? VideoQuality.MEDIUM :
+                                     VideoQuality.LOW
 
-    try {
-      // Apply constraints to the underlying MediaStreamTrack
-      const track = pub.videoTrack.mediaStreamTrack
-      void track.applyConstraints({
-        width: { ideal: tier.resolution.w },
-        height: { ideal: tier.resolution.h },
-        frameRate: { ideal: tier.fps },
-      })
-    } catch {
-      // Constraints not supported
+    for (const participant of this.room.remoteParticipants.values()) {
+      for (const pub of participant.trackPublications.values()) {
+        if (pub.kind === Track.Kind.Video && pub.isSubscribed) {
+          pub.setVideoQuality(quality)
+        }
+      }
     }
   }
 
