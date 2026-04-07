@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { type RemoteVideoTrack, type LocalVideoTrack } from 'livekit-client'
 import SpeakingIndicator from './SpeakingIndicator'
 
@@ -48,6 +48,7 @@ export default function VideoTile({
   mirrored = false,
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [isPortrait, setIsPortrait] = useState(false)
 
   useEffect(() => {
     const el = videoRef.current
@@ -59,8 +60,22 @@ export default function VideoTile({
     }
   }, [track])
 
-  const dims = track && 'dimensions' in track ? (track as { dimensions?: { width: number; height: number } }).dimensions : undefined
-  const isPortrait = dims ? dims.height > dims.width : false
+  // Reactively detect portrait from actual video stream dimensions once playing
+  useEffect(() => {
+    const el = videoRef.current
+    if (!el) return
+    const update = () => {
+      if (el.videoWidth && el.videoHeight) {
+        setIsPortrait(el.videoHeight > el.videoWidth)
+      }
+    }
+    el.addEventListener('loadedmetadata', update)
+    el.addEventListener('resize', update)
+    return () => {
+      el.removeEventListener('loadedmetadata', update)
+      el.removeEventListener('resize', update)
+    }
+  }, [])
 
   return (
     <div className={`relative overflow-hidden bg-black/40 ${className}`}>

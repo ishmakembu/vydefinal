@@ -6,17 +6,20 @@ import {
 } from 'livekit-client'
 
 export const ROOM_OPTIONS: RoomOptions = {
-  adaptiveStream: {
-    pauseVideoInBackground: false,
-  },
+  // pixelDensity:'screen' requests layers sized for actual display pixels,
+  // preventing the adaptive stream from dropping to the lowest layer.
+  adaptiveStream: { pixelDensity: 'screen' },
   dynacast: true,
   publishDefaults: {
-    // H264 baseline: universally supported, no hardware encoder required
+    // Start at 360p minimum — 180p (320×180) is unusable
     videoSimulcastLayers: [
-      VideoPresets.h180,
       VideoPresets.h360,
       VideoPresets.h720,
     ],
+    videoEncoding: {
+      maxBitrate: 1_500_000,
+      maxFramerate: 30,
+    },
     dtx: true,
     red: true,
     forceStereo: false,
@@ -31,7 +34,8 @@ export const ROOM_OPTIONS: RoomOptions = {
     channelCount: 1,
   },
   videoCaptureDefaults: {
-    resolution: VideoPresets.h720.resolution,
+    // No fixed resolution — let the device use its natural orientation.
+    // A hardcoded 1280×720 landscape resolution breaks portrait phone cameras.
     facingMode: 'user',
   },
 }
