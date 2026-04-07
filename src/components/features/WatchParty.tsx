@@ -2,93 +2,160 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Clapperboard, Play, Pause, SkipBack, SkipForward } from 'lucide-react'
+import { X, Clapperboard, Play, Pause, SkipBack, SkipForward, Shield, Users } from 'lucide-react'
 import { useUIStore } from '@/store/ui'
+import { useCallStore } from '@/store/call'
 import { sendPartyMessage } from '@/lib/partykit'
 import GlassCard from '@/components/ui/GlassCard'
 
-const SYNC_TOLERANCE_S = 3
+const SYNC_TOLERANCE_S = 2
 
 export default function WatchParty() {
   const { isTheatreMode, watchState, setWatchState } = useUIStore()
+  const { localParticipant } = useCallStore.getState()
   const [urlInput, setUrlInput] = useState('')
   const [inputVisible, setInputVisible] = useState(false)
+  const [estimatedPosition, setEstimatedPosition] = useState(0)
+  
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const playerRef = useRef<{ currentTime: number; playing: boolean }>({
-    currentTime: 0,
-    playing: false,
-  })
-  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastSyncUrlRef = useRef<string | null>(null)
+  const localTimeRef = useRef<number>(0)
+  
+  const myId = localParticipant?.identity || 'anonymous'
+  const isController = watchState?.controllerId === myId
 
-  // Periodic sync check (every 2s)
+  // ── 1. Estimated Time Sync ────────────────────────────────
   useEffect(() => {
-    if (!isTheatreMode || !watchState) return
-
-    syncIntervalRef.current = setInterval(() => {
-      // Drift check would be here with a real embedded player API
-      // For iframe-based players, we rely on PartyKit sync messages
-    }, 2000)
-
-    return () => {
-      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current)
+    if (!watchState) return
+    
+    const updateTime = () => {
+      if (watchState.playing) {
+        const elapsed = (Date.now() - watchState.lastSyncAt) / 1000
+        const current = watchState.position + elapsed
+        setEstimatedPosition(current)
+        localTimeRef.current = current
+      } else {
+        setEstimatedPosition(watchState.position)
+        localTimeRef.current = watchState.position
+      }
     }
-  }, [isTheatreMode, watchState])
+
+    updateTime()
+    const timer = setInterval(updateTime, 500)
+    return () => clearInterval(timer)
+  }, [watchState])
+
+  // ── 2. Heartbeat (Controller Only) ────────────────────────
+  useEffect(() => {
+    if (!isTheatreMode || !watchState || !isController) return
+
+    const heartbeat = setInterval(() => {
+      // Small optimization: only heartbeat if playing to keep everyone in sync
+      if (watchState.playing) {
+        sendPartyMessage({ 
+          type: 'watch_heartbeat', 
+          position: localTimeRef.current, 
+          playing: true, 
+          ts: Date.now(),
+          userId: myId
+        })
+      }
+    }, 5000)
+
+    return () => clearInterval(heartbeat)
+  }, [isTheatreMode, watchState, isController, myId])
+
+  // ── 3. Iframe Source Management (Drift Correction) ────────
+  const embedUrl = watchState?.url
+    ? `${watchState.url}${watchState.url.includes('?') ? '&' : '?'}autoplay=${watchState.playing ? 1 : 0}&t=${Math.floor(estimatedPosition)}`
+    : null
+
+  useEffect(() => {
+    if (!isTheatreMode || !watchState?.url) return
+
+    const drift = Math.abs(localTimeRef.current - estimatedPosition)
+    const urlChanged = watchState.url !== lastSyncUrlRef.current?.split('?')[0]
+    
+    // Only update iframe src if:
+    // 1. The main URL changed (new video)
+    // 2. We joined/resumed and haven't synced yet
+    // 3. The drift is massive (> SYNC_TOLERANCE_S)
+    if (urlChanged || !lastSyncUrlRef.current || drift > SYNC_TOLERANCE_S) {
+      lastSyncUrlRef.current = embedUrl
+      if (iframeRef.current) iframeRef.current.src = embedUrl || ''
+    }
+  }, [isTheatreMode, watchState?.url, watchState?.playing, estimatedPosition, embedUrl])
 
   const handleLoadUrl = useCallback(() => {
     const url = urlInput.trim()
     if (!url) return
-    const newState = { url, playing: false, position: 0, lastSyncAt: Date.now() }
+    const newState = { url, playing: false, position: 0, lastSyncAt: Date.now(), controllerId: myId }
     setWatchState(newState)
-    sendPartyMessage({ type: 'watch_url', url, userId: 'me' })
+    sendPartyMessage({ type: 'watch_url', url, userId: myId })
     setUrlInput('')
     setInputVisible(false)
-  }, [urlInput, setWatchState])
+  }, [urlInput, setWatchState, myId])
 
   const handlePlay = useCallback(() => {
     if (!watchState) return
-    const pos = playerRef.current.currentTime
-    const updated = { ...watchState, playing: true, position: pos, lastSyncAt: Date.now() }
-    setWatchState(updated)
-    sendPartyMessage({ type: 'watch_play', position: pos, ts: Date.now() })
-  }, [watchState, setWatchState])
+    const pos = localTimeRef.current
+    setWatchState({ ...watchState, playing: true, position: pos, lastSyncAt: Date.now(), controllerId: myId })
+    sendPartyMessage({ type: 'watch_play', position: pos, ts: Date.now(), userId: myId })
+  }, [watchState, setWatchState, myId])
 
   const handlePause = useCallback(() => {
     if (!watchState) return
-    const pos = playerRef.current.currentTime
-    const updated = { ...watchState, playing: false, position: pos }
-    setWatchState(updated)
-    sendPartyMessage({ type: 'watch_pause', position: pos })
-  }, [watchState, setWatchState])
+    const pos = localTimeRef.current
+    setWatchState({ ...watchState, playing: false, position: pos, controllerId: myId })
+    sendPartyMessage({ type: 'watch_pause', position: pos, userId: myId })
+  }, [watchState, setWatchState, myId])
 
   const handleSeek = useCallback((delta: number) => {
     if (!watchState) return
-    const newPos = Math.max(0, watchState.position + delta)
-    const updated = { ...watchState, position: newPos }
-    setWatchState(updated)
-    sendPartyMessage({ type: 'watch_seek', position: newPos })
-  }, [watchState, setWatchState])
+    const newPos = Math.max(0, localTimeRef.current + delta)
+    setWatchState({ ...watchState, position: newPos, lastSyncAt: Date.now(), controllerId: myId })
+    sendPartyMessage({ type: 'watch_seek', position: newPos, userId: myId })
+  }, [watchState, setWatchState, myId])
 
   if (!isTheatreMode) return null
-
-  const embedUrl = watchState?.url
-    ? `${watchState.url}${watchState.url.includes('?') ? '&' : '?'}autoplay=${watchState.playing ? 1 : 0}&t=${Math.floor(watchState.position)}`
-    : null
 
   return (
     <div className="absolute inset-0 z-10 flex flex-col" style={{ background: '#000' }}>
       {/* Cinema mode badge */}
-      <div
-        className="absolute top-4 left-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-        style={{
-          background: 'var(--glass-bg-strong)',
-          border: '1px solid var(--glass-border)',
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        <Clapperboard size={14} style={{ color: 'var(--accent-purple)' }} />
-        <span className="text-xs font-medium" style={{ color: 'var(--accent-purple)', fontFamily: 'var(--font-display)' }}>
-          Theatre Mode
-        </span>
+      <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+        <div
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+          style={{
+            background: 'var(--glass-bg-strong)',
+            border: '1px solid var(--glass-border)',
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          <Clapperboard size={14} style={{ color: 'var(--accent-purple)' }} />
+          <span className="text-xs font-medium" style={{ color: 'var(--accent-purple)', fontFamily: 'var(--font-display)' }}>
+            Theatre Mode
+          </span>
+        </div>
+
+        {watchState?.url && (
+          <div
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+            style={{
+              background: isController ? 'rgba(167, 139, 250, 0.15)' : 'var(--glass-bg-strong)',
+              border: `1px solid ${isController ? 'rgba(167, 139, 250, 0.4)' : 'var(--glass-border)'}`,
+              backdropFilter: 'blur(12px)',
+            }}
+          >
+            {isController ? (
+              <Shield size={12} style={{ color: 'var(--accent-purple)' }} />
+            ) : (
+              <Users size={12} style={{ color: 'var(--text-muted)' }} />
+            )}
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: isController ? 'var(--accent-purple)' : 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
+              {isController ? 'Sync Leader' : 'Synced'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Content area */}

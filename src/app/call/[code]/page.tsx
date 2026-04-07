@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -176,16 +176,22 @@ export default function CallPage() {
           useUIStore.getState().setMusicQueue(useUIStore.getState().musicQueue.slice(1))
           break
         case 'watch_url':
-          setWatchState({ url: msg.url, playing: false, position: 0, lastSyncAt: Date.now() })
+          setWatchState({ url: msg.url, playing: false, position: 0, lastSyncAt: Date.now(), controllerId: msg.userId })
           break
         case 'watch_play':
-          setWatchState({ ...useUIStore.getState().watchState!, playing: true, position: msg.position, lastSyncAt: msg.ts })
+          setWatchState({ ...useUIStore.getState().watchState!, playing: true, position: msg.position, lastSyncAt: msg.ts, controllerId: msg.userId })
           break
         case 'watch_pause':
-          setWatchState({ ...useUIStore.getState().watchState!, playing: false, position: msg.position })
+          setWatchState({ ...useUIStore.getState().watchState!, playing: false, position: msg.position, controllerId: msg.userId })
           break
         case 'watch_seek':
-          setWatchState({ ...useUIStore.getState().watchState!, position: msg.position })
+          setWatchState({ ...useUIStore.getState().watchState!, position: msg.position, lastSyncAt: Date.now(), controllerId: msg.userId })
+          break
+        case 'watch_heartbeat':
+          // Only sync from heartbeat if we are not the one who sent it
+          if (msg.userId !== userIdRef.current) {
+            setWatchState({ ...useUIStore.getState().watchState!, playing: msg.playing, position: msg.position, lastSyncAt: msg.ts, controllerId: msg.userId })
+          }
           break
         case 'theatre_toggle':
           if (msg.active !== useUIStore.getState().isTheatreMode) toggleTheatre()
@@ -373,14 +379,34 @@ export default function CallPage() {
     setTimeout(() => router.replace(`/?ended=1&duration=${callDuration}`), 300)
   }, [router, callDuration])
 
+  const wasCameraEnabledRef = useRef(false)
   const handleToggleScreenShare = useCallback(async () => {
     if (!roomRef.current) return
-    const { isScreenSharing, setScreenSharing } = useCallStore.getState()
+    const { isScreenSharing, setScreenSharing, isCameraOn } = useCallStore.getState()
+    const newState = !isScreenSharing
+
     try {
-      await roomRef.current.localParticipant.setScreenShareEnabled(!isScreenSharing)
-      setScreenSharing(!isScreenSharing)
+      if (newState) {
+        // Turning screen share ON: remember camera state
+        wasCameraEnabledRef.current = isCameraOn
+      }
+
+      await roomRef.current.localParticipant.setScreenShareEnabled(newState)
+      setScreenSharing(newState)
+
+      // Restoration: if we turned screen share OFF, and camera was previously ON, resume it.
+      if (!newState && wasCameraEnabledRef.current) {
+        // Brief delay ensures the browser has released the screen share lock before 
+        // attempting to re-acquire the camera.
+        setTimeout(async () => {
+          try {
+            await roomRef.current?.localParticipant.setCameraEnabled(true)
+            setCamera(true)
+          } catch (e) { console.warn('camera resume error', e) }
+        }, 300)
+      }
     } catch { /* user cancelled or not supported */ }
-  }, [])
+  }, [setCamera])
 
   const handleSendReaction = useCallback((emoji: string) => {
     const id = nanoid()

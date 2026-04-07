@@ -28,6 +28,7 @@ export interface WatchState {
   playing: boolean
   position: number
   lastSyncAt: number
+  controllerId?: string
 }
 
 export interface Reaction {
@@ -53,9 +54,10 @@ export type VydeMessage =
   | { type: 'music_skip' }
   | { type: 'music_reorder'; queue: MusicTrack[] }
   | { type: 'watch_url'; url: string; userId: string }
-  | { type: 'watch_play'; position: number; ts: number }
-  | { type: 'watch_pause'; position: number }
-  | { type: 'watch_seek'; position: number }
+  | { type: 'watch_play'; position: number; ts: number; userId: string }
+  | { type: 'watch_pause'; position: number; userId: string }
+  | { type: 'watch_seek'; position: number; userId: string }
+  | { type: 'watch_heartbeat'; position: number; playing: boolean; ts: number; userId: string }
   | { type: 'theatre_toggle'; active: boolean }
   | { type: 'ping' }
   | { type: 'pong' }

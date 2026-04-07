@@ -28,7 +28,9 @@ export const ROOM_OPTIONS: RoomOptions = {
       maxBitrate: 1_500_000,
       maxFramerate: 30,
     },
-    dtx: true,
+    // Disabling DTX (Discontinuous Transmission) to fix reported audio cut-outs. 
+    // DTX can mistake speech for background silence on certain Windows/Mac setups.
+    dtx: false,
     red: true,
     forceStereo: false,
     stopMicTrackOnMute: false,
@@ -38,9 +40,8 @@ export const ROOM_OPTIONS: RoomOptions = {
     echoCancellation: true,
     noiseSuppression: true,
     autoGainControl: true,
-    // Removing strict 48k sample rate to allow the browser to negotiate the best
-    // hardware-native rate, improving compatibility across diverse device mics.
-    channelCount: 1,
+    // Letting the browser negotiate the best device-native sampleRate and channelCount.
+    // This fixed several reports of 'No Audio' where hardware preferred 48k Stereo or 44.1k Mono.
   },
   videoCaptureDefaults: {
     // Capturing at 720p — Reduces encoding overhead by ~50% compared to 1080p,
