@@ -121,6 +121,7 @@ export default function VideoCanvas({
         isCameraOff={!isPipLocal ? !isCameraOn : false}
         displayName={mainLabel}
         mirrored={!isPipLocal}
+        muted={!isPipLocal} // local video tile is always muted (no echo); remote is NOT muted
         className="w-full h-full rounded-[22px] overflow-hidden"
       />
 
@@ -168,6 +169,7 @@ export default function VideoCanvas({
               isCameraOff={isPipLocal ? !isCameraOn : false}
               displayName={pipLabel}
               mirrored={isPipLocal}
+              muted={isPipLocal} // PiP is local when isPipLocal=true — mute to avoid echo
               className="w-full h-full"
             />
             {/* Swap button */}

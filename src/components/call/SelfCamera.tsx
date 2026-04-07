@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { type RemoteVideoTrack, type LocalVideoTrack } from 'livekit-client'
 import SpeakingIndicator from './SpeakingIndicator'
 
@@ -12,6 +12,7 @@ interface VideoTileProps {
   displayName?: string
   className?: string
   mirrored?: boolean
+  muted?: boolean
 }
 
 function AvatarFallback({ name }: { name: string }) {
@@ -46,36 +47,16 @@ export default function VideoTile({
   displayName = 'User',
   className = '',
   mirrored = false,
+  muted = false,
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [isPortrait, setIsPortrait] = useState(false)
 
   useEffect(() => {
     const el = videoRef.current
     if (!el || !track) return
-
     track.attach(el)
-    return () => {
-      track.detach(el)
-    }
+    return () => { track.detach(el) }
   }, [track])
-
-  // Reactively detect portrait from actual video stream dimensions once playing
-  useEffect(() => {
-    const el = videoRef.current
-    if (!el) return
-    const update = () => {
-      if (el.videoWidth && el.videoHeight) {
-        setIsPortrait(el.videoHeight > el.videoWidth)
-      }
-    }
-    el.addEventListener('loadedmetadata', update)
-    el.addEventListener('resize', update)
-    return () => {
-      el.removeEventListener('loadedmetadata', update)
-      el.removeEventListener('resize', update)
-    }
-  }, [])
 
   return (
     <div className={`relative overflow-hidden bg-black/40 ${className}`}>
@@ -86,13 +67,14 @@ export default function VideoTile({
           ref={videoRef}
           autoPlay
           playsInline
-          muted
+          muted={muted}
           style={{
             width: '100%',
             height: '100%',
-            objectFit: isPortrait ? 'contain' : 'cover',
+            // Always contain — never crop/zoom regardless of portrait or landscape.
+            // 'cover' fills the tile but cuts off the edges which feels intrusive.
+            objectFit: 'contain',
             transform: mirrored ? 'scaleX(-1)' : 'none',
-            transition: 'object-fit 0.2s ease',
           }}
         />
       ) : (

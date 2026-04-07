@@ -45,7 +45,7 @@ function ControlButton({ label, onClick, active, danger, featured, children, siz
       aria-label={label}
       className={cn(
         'flex flex-col items-center justify-center gap-1 rounded-[16px] transition-all duration-200 active:scale-95',
-        size === 'lg' ? 'w-14 h-14' : size === 'sm' ? 'w-10 h-10' : 'w-12 h-12',
+        size === 'lg' ? 'w-12 h-12 sm:w-14 sm:h-14' : size === 'sm' ? 'w-8 h-8 sm:w-10 sm:h-10' : 'w-10 h-10 sm:w-12 sm:h-12',
         'disabled:opacity-40 disabled:cursor-not-allowed'
       )}
       style={{
@@ -90,7 +90,7 @@ export default function CallControls({
   roomRef,
 }: CallControlsProps) {
   const { isMicOn, isCameraOn, isScreenSharing, setMic, setCamera } = useCallStore()
-  const { toggleChat, toggleTheatre, toggleMusic, isTheatreMode, isMusicOpen } = useUIStore()
+  const { toggleChat, toggleTheatre, toggleMusic, isTheatreMode, isMusicOpen, isChatOpen } = useUIStore()
   const [showReactions, setShowReactions] = useState(false)
   const reactionsRef = useRef<HTMLDivElement>(null)
 
@@ -151,23 +151,23 @@ export default function CallControls({
     } catch (e) { console.warn('camera toggle error', e) }
   }, [roomRef, isCameraOn, setCamera])
 
-  const handleToggleTheatre = () => {
+  const handleToggleTheatre = useCallback(() => {
     const newState = !isTheatreMode
     toggleTheatre()
     sendPartyMessage({ type: 'theatre_toggle', active: newState })
-  }
+  }, [isTheatreMode, toggleTheatre])
 
   return (
     <div
-      className="relative flex items-center justify-between gap-2 px-4 py-3 rounded-[22px]"
+      className="relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-3 rounded-[22px]"
       style={{
         background: 'var(--glass-bg-strong)',
         border: '1px solid var(--glass-border)',
         backdropFilter: 'blur(24px)',
       }}
     >
-      {/* Left group: features */}
-      <div className="flex items-center gap-2">
+      {/* Left group: features — order-1 both mobile and desktop */}
+      <div className="flex items-center gap-1.5 sm:gap-2 order-1">
         <ControlButton label="Theatre mode" onClick={handleToggleTheatre} featured={isTheatreMode}>
           <Clapperboard size={18} />
         </ControlButton>
@@ -179,34 +179,8 @@ export default function CallControls({
         </ControlButton>
       </div>
 
-      {/* Center group: core */}
-      <div className="flex items-center gap-3">
-        <ControlButton label={isMicOn ? 'Mute mic (M)' : 'Unmute mic (M)'} onClick={() => void handleToggleMic()} active={!isMicOn}>
-          {isMicOn ? <Mic size={20} /> : <MicOff size={20} />}
-        </ControlButton>
-
-        {/* End call */}
-        <button
-          onClick={onEndCall}
-          title="End call"
-          aria-label="End call"
-          className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
-          style={{
-            background: 'var(--danger)',
-            color: '#fff',
-            boxShadow: '0 4px 20px rgba(248,113,113,0.4)',
-          }}
-        >
-          <PhoneOff size={22} />
-        </button>
-
-        <ControlButton label={isCameraOn ? 'Turn off camera (V)' : 'Turn on camera (V)'} onClick={() => void handleToggleCamera()} active={!isCameraOn}>
-          {isCameraOn ? <Video size={20} /> : <VideoOff size={20} />}
-        </ControlButton>
-      </div>
-
-      {/* Right group: extras */}
-      <div className="flex items-center gap-2">
+      {/* Right group: extras — order-2 on mobile (same row as left), order-3 on desktop */}
+      <div className="flex items-center gap-1.5 sm:gap-2 order-2 sm:order-3">
         {/* Reactions */}
         <div ref={reactionsRef} className="relative">
           <ControlButton label="Reactions" onClick={() => setShowReactions(p => !p)} featured={showReactions}>
@@ -218,7 +192,7 @@ export default function CallControls({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.15 }}
-              className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex gap-1.5 px-3 py-2 rounded-full"
+              className="absolute bottom-full mb-2 right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 flex gap-1.5 px-3 py-2 rounded-full"
               style={{
                 background: 'var(--glass-bg-strong)',
                 border: '1px solid var(--glass-border)',
@@ -247,12 +221,38 @@ export default function CallControls({
           <ArrowLeftRight size={18} />
         </ControlButton>
 
-        <ControlButton label="Toggle picture-in-picture" onClick={onTogglePip} featured={!showPip}>
+        <ControlButton label="Toggle picture-in-picture" onClick={onTogglePip} featured={showPip}>
           <PictureInPicture2 size={18} />
         </ControlButton>
 
-        <ControlButton label="Chat (C)" onClick={toggleChat}>
+        <ControlButton label="Chat (C)" onClick={toggleChat} featured={isChatOpen}>
           <MoreHorizontal size={18} />
+        </ControlButton>
+      </div>
+
+      {/* Center group: core controls — order-3 on mobile (own full row), order-2 on desktop */}
+      <div className="flex items-center justify-center gap-2 sm:gap-3 order-3 sm:order-2 w-full sm:w-auto">
+        <ControlButton label={isMicOn ? 'Mute mic (M)' : 'Unmute mic (M)'} onClick={() => void handleToggleMic()} active={!isMicOn}>
+          {isMicOn ? <Mic size={20} /> : <MicOff size={20} />}
+        </ControlButton>
+
+        {/* End call */}
+        <button
+          onClick={onEndCall}
+          title="End call"
+          aria-label="End call"
+          className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
+          style={{
+            background: 'var(--danger)',
+            color: '#fff',
+            boxShadow: '0 4px 20px rgba(248,113,113,0.4)',
+          }}
+        >
+          <PhoneOff size={22} />
+        </button>
+
+        <ControlButton label={isCameraOn ? 'Turn off camera (V)' : 'Turn on camera (V)'} onClick={() => void handleToggleCamera()} active={!isCameraOn}>
+          {isCameraOn ? <Video size={20} /> : <VideoOff size={20} />}
         </ControlButton>
       </div>
     </div>
