@@ -412,7 +412,10 @@ export default function CallPage() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden" style={{ background: 'var(--bg-base)' }}>
+    <div
+      className="w-screen flex flex-col overflow-hidden"
+      style={{ background: 'var(--bg-base)', height: '100dvh' }}
+    >
       <BackgroundOrbs />
       <ToastSystem />
 
